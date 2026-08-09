@@ -1,0 +1,1586 @@
+function startLightsEcho() {
+            const AUDIO_LINKS = {
+                bgMusic: "https://www.dropbox.com/scl/fi/17m3cmp2m73znnnnt8ygt/Sorrowful-Ocarina.mp3?rlkey=tqwqid9ppbliz5vy95cbvi8ms&st=84l2aaos&raw=1",
+                bossMusic: "https://www.dropbox.com/scl/fi/q5ghvtq64xbgx5v62ru9d/Boss-battle.mp3?rlkey=s499pw9789r7gl6vahl5csspw&st=hkvz02oz&raw=1",
+                bossWave: "https://www.dropbox.com/scl/fi/bxeg1ff13s6mh7tjcdurk/Boss-wave.mp3?rlkey=w0azr1x1m1aru08w1rpeejar0&st=afkooqca&raw=1",
+                bossRain: "",
+                bossDeath: "https://www.dropbox.com/scl/fi/f1tm2xxpurtueyroj15mr/Boss-die.mp3?rlkey=k2xxm4yeu58yy0ivvw36tl9z7&st=23m0un09&raw=1",
+                bossRest: "https://www.dropbox.com/scl/fi/eoprngn83owjqankds172/Boss-rests.mp3?rlkey=nsuv5uzar5s0xs7nr7wqdhyk0&st=g9lvp907&raw=1",
+                bossHeartbeat: "https://www.dropbox.com/scl/fi/r67f9dxkqbf1495oqnjg9/.mp3?rlkey=is25es54oek2wm4yqul4fcsd1&st=u4nfdq3u&raw=1",
+                playerMelee: "https://www.dropbox.com/scl/fi/jt2kkpg8halvykr6uab0u/Instant_sharp_energy_-3-1781544503331.mp3?rlkey=tdwo4h2c71vbbfr8lqz6w7ejs&st=qmeewnsg&raw=1",
+                playerShoot: "https://www.dropbox.com/scl/fi/1o3crotaxcntxw1opq9a4/Instant_short_energy_-3-1781544812319.mp3?rlkey=e2lujt15hleue5dd2gpbdyyru&st=i0s13rvh&raw=1",
+                enemyAttack: "https://www.dropbox.com/scl/fi/jifijxn693ebv1desq1ge/Slimy-_wet-_dangerou_-1-1781545321218.mp3?rlkey=nhdblsa6gnx6tqywsmwzy5u1r&st=iuraow8e&raw=1",
+                playerHurt: "https://www.dropbox.com/scl/fi/awh9yul6azmh2ze8jezzh/Instant_sharp_flesh__-1-1781545478502.mp3?rlkey=z7bmm08jkowfkg7wut1ml5e3h&st=ur3r9wyx&raw=1",
+                enemyDeath: "https://www.dropbox.com/scl/fi/1khh4wrqtlzwfglkpzzci/Instant_wet_slime_ex_-2-1781545674820.mp3?rlkey=64xphxst2uttkgoofl7um1d0m&st=z3rdzpup&raw=1",
+                victory: "https://www.dropbox.com/scl/fi/lso6ulay6qwcr2z7kvxhb/Instant_divine_light_-2-1781545813767.mp3?rlkey=lo7vvikyr6ya0hyofgj4cuzed&st=ai8y9th7&raw=1",
+                defeat: "https://www.dropbox.com/scl/fi/g9krjpyplbaiiupx9etvm/Instant_loud_cinemat_-1-1781546087234.mp3?rlkey=pau6exdoedrh3l6j7thz0l7qb&st=45dnovqt&raw=1"
+            };
+
+            const LOOPING_AUDIO_KEYS = ["bossHeartbeat"];
+            const BOSS_MUSIC_KEYS = ["bossMusic"];
+
+            let bgAudio = null;
+            let bossBgAudio = null;
+            let bossHeartbeatAudio = null;
+            const soundCache = {};
+            const audioObjectsCache = {};
+            let audioContextStarted = false;
+            let musicMuted = false;
+            let currentDifficulty = "medium";
+            let gameState = "MENU";
+            let playMode = "level";
+
+            const DIFFICULTY_SETTINGS = {
+                easy: { hearts: 5, bossHp: 18 },
+                medium: { hearts: 3, bossHp: 28 },
+                hard: { hearts: 1, bossHp: 38 }
+            };
+
+            function initAudio() {
+                if (audioContextStarted) return;
+
+                let hasAnyLink = Object.values(AUDIO_LINKS).some(link => link && link.trim() !== "");
+                if (!hasAnyLink) return;
+
+                audioContextStarted = true;
+
+                const notice = document.getElementById("audio-notice");
+                if (notice) notice.style.display = "none";
+
+                for (let key in AUDIO_LINKS) {
+                    if (key === "bgMusic" || BOSS_MUSIC_KEYS.includes(key) || LOOPING_AUDIO_KEYS.includes(key)) continue;
+                    if (AUDIO_LINKS[key] && AUDIO_LINKS[key].trim() !== "") {
+                        soundCache[key] = AUDIO_LINKS[key];
+                        audioObjectsCache[key] = [];
+                        for (let i = 0; i < 4; i++) {
+                            const snd = new Audio(soundCache[key]);
+                            snd.volume = 0.6;
+                            snd.preload = "auto";
+                            snd.load();
+                            audioObjectsCache[key].push(snd);
+                        }
+                    }
+                }
+
+                if (AUDIO_LINKS.bgMusic && AUDIO_LINKS.bgMusic.trim() !== "") {
+                    if (bgAudio) bgAudio.pause();
+                    bgAudio = new Audio(AUDIO_LINKS.bgMusic);
+                    bgAudio.loop = true;
+                    bgAudio.volume = 0.35;
+                    bgAudio.muted = musicMuted;
+                    bgAudio.play().catch(e => console.log("Browser is waiting for a music click:", e));
+                }
+            }
+
+            function playSound(key) {
+                if (!audioContextStarted) return;
+
+                if (soundCache[key]) {
+                    let pool = audioObjectsCache[key] || [];
+                    let snd = pool.find(item => item.paused || item.ended);
+                    if (!snd) {
+                        snd = new Audio(soundCache[key]);
+                        snd.volume = 0.6;
+                        pool.push(snd);
+                        audioObjectsCache[key] = pool;
+                    }
+                    snd.currentTime = 0;
+                    snd.play().catch(e => console.log("Sound effect failed " + key + ":", e));
+                }
+            }
+
+            function stopBgMusic() {
+                if (bgAudio) {
+                    bgAudio.pause();
+                    bgAudio.currentTime = 0;
+                }
+                stopBossAudio();
+            }
+
+            function resumeBgMusic() {
+                stopBossAudio();
+                if (playMode === "boss") return;
+                if (bgAudio && audioContextStarted && (gameState === "PLAYING" || gameState === "MENU")) {
+                    bgAudio.muted = musicMuted;
+                    bgAudio.play().catch(e => console.log(e));
+                }
+            }
+
+            function toggleMusic() {
+                musicMuted = !musicMuted;
+                if (bgAudio) bgAudio.muted = musicMuted;
+                if (bossBgAudio) bossBgAudio.muted = musicMuted;
+                if (bossHeartbeatAudio) bossHeartbeatAudio.muted = musicMuted;
+                updateMusicButton();
+            }
+
+            function stopBossAudio() {
+                if (bossBgAudio) {
+                    bossBgAudio.pause();
+                    bossBgAudio.currentTime = 0;
+                    bossBgAudio = null;
+                }
+                if (bossHeartbeatAudio) {
+                    bossHeartbeatAudio.pause();
+                    bossHeartbeatAudio.currentTime = 0;
+                    bossHeartbeatAudio = null;
+                }
+            }
+
+            function startBossMusic() {
+                if (!audioContextStarted) return;
+
+                if (bgAudio) bgAudio.pause();
+                if (bossBgAudio) return;
+
+                const link = AUDIO_LINKS.bossMusic;
+                if (!link || link.trim() === "") return;
+
+                bossBgAudio = new Audio(link);
+                bossBgAudio.loop = true;
+                bossBgAudio.volume = 0.42;
+                bossBgAudio.muted = musicMuted;
+                bossBgAudio.play().catch(e => console.log("Boss music failed:", e));
+            }
+
+            function startBossHeartbeat() {
+                if (!audioContextStarted) return;
+                const link = AUDIO_LINKS.bossHeartbeat;
+                if (!link || link.trim() === "") return;
+                if (bossHeartbeatAudio) return;
+
+                bossHeartbeatAudio = new Audio(link);
+                bossHeartbeatAudio.loop = true;
+                bossHeartbeatAudio.volume = 0.55;
+                bossHeartbeatAudio.muted = musicMuted;
+                bossHeartbeatAudio.play().catch(e => console.log("Boss heartbeat failed:", e));
+            }
+
+            function setBossHeartbeatActive(active) {
+                if (!bossHeartbeatAudio) return;
+                if (active) {
+                    if (bossHeartbeatAudio.paused) {
+                        bossHeartbeatAudio.play().catch(e => console.log("Boss heartbeat resume failed:", e));
+                    }
+                } else {
+                    bossHeartbeatAudio.pause();
+                }
+            }
+
+            function updateMusicButton() {
+                const btn = document.getElementById("btn-toggle-music");
+                if (btn) btn.innerText = musicMuted ? "MUSIC OFF" : "MUSIC ON";
+            }
+
+            const canvas = document.getElementById("gameCanvas");
+            if (!canvas) return;
+            const ctx = canvas.getContext("2d");
+
+            canvas.width = 800;
+            canvas.height = 450;
+
+            const KEYS = {};
+            const HEART_ENTITY = "&#10084;";
+            let lastTime = 0;
+            let camera = { x: 0, y: 0, width: canvas.width, height: canvas.height };
+
+            let player = {
+                x: 80, y: 200, width: 24, height: 32, vx: 0, vy: 0,
+                speed: 4.1, acceleration: 0.55, airAcceleration: 0.32, friction: 0.84, airFriction: 0.94,
+                jumpForce: -9.2, gravity: 0.38, maxFallSpeed: 10.5,
+                isGrounded: false, coyoteTimer: 0, jumpBuffer: 0, direction: 1,
+                lightAngle: 0.45, lightRange: 230,
+                hearts: 5, maxHearts: 5, lightEnergy: 100, maxLightEnergy: 100,
+                flashActive: false, flashRadius: 0, hurtTimer: 0, invulnerableTimer: 0,
+                squishX: 1, squishY: 1,
+                shootCooldown: 0, muzzleFlashTimer: 0, muzzleFlashX: 0, muzzleFlashY: 0,
+                meleeActive: false, meleeTimer: 0, meleeMaxTimer: 10, meleeRange: 55,
+                lastSafeX: 80, lastSafeY: 200
+            };
+
+            let platforms = [];
+            let grassTufts = [];
+            let enemies = [];
+            let enemyProjectiles = [];
+            let playerProjectiles = [];
+            let FXParticles = [];
+            let finishPortal = { x: 2000, y: 130, w: 40, h: 100 };
+            let bossProjectiles = [];
+            let bossWaves = [];
+            let bossCrystal = null;
+            let bossRoomLit = false;
+            let victoryDelay = 0;
+            let boss = null;
+
+            const bossRoom = {
+                floorY: 374,
+                leftWall: 24,
+                rightWall: 776,
+                bossX: 400
+            };
+
+            function getBossHangY(bossHeight) {
+                return bossRoom.floorY - player.height * 1.5 - bossHeight / 2;
+            }
+
+            function getBossRainSafeHalfWidth() {
+                return 120; // безопасная зона
+            }
+
+            function isPlayerInBossRainSafeZone() {
+                if (!boss) return true;
+                const px = player.x + player.width / 2;
+                return Math.abs(px - boss.x) < getBossRainSafeHalfWidth();
+            }
+
+            const basePlatforms = [
+                { x: 0, y: 350, w: 250, h: 100 }, { x: 340, y: 300, w: 120, h: 20 },
+                { x: 530, y: 260, w: 100, h: 20 }, { x: 720, y: 310, w: 150, h: 20 },
+                { x: 950, y: 270, w: 200, h: 20 }, { x: 1230, y: 320, w: 100, h: 20 },
+                { x: 1400, y: 240, w: 120, h: 20 }, { x: 1650, y: 280, w: 80, h: 20 },
+                { x: 1850, y: 310, w: 80, h: 20 }, { x: 2050, y: 250, w: 80, h: 20 },
+                { x: 2200, y: 340, w: 250, h: 110 }, { x: 2550, y: 290, w: 140, h: 20 },
+                { x: 2780, y: 250, w: 110, h: 20 }, { x: 2980, y: 320, w: 160, h: 20 },
+                { x: 3250, y: 270, w: 70, h: 20 }, { x: 3450, y: 270, w: 70, h: 20 },
+                { x: 3650, y: 270, w: 70, h: 20 }, { x: 3850, y: 330, w: 300, h: 120 },
+                { x: 4250, y: 280, w: 120, h: 20 }, { x: 4450, y: 240, w: 100, h: 20 },
+                { x: 4650, y: 230, w: 350, h: 220 }
+            ];
+
+            const baseEnemySpawns = [
+                { x: 1000, y: 242, minX: 960, maxX: 1130 },
+                { x: 1420, y: 212, minX: 1400, maxX: 1500 },
+                { x: 2250, y: 312, minX: 2210, maxX: 2420 },
+                { x: 3000, y: 292, minX: 2990, maxX: 3120 },
+                { x: 3900, y: 302, minX: 3860, maxX: 4120 }
+            ];
+
+            function buildLevel(difficulty) {
+                platforms = [];
+                enemies = [];
+                grassTufts = [];
+                enemyProjectiles.length = 0;
+                playerProjectiles.length = 0;
+                FXParticles.length = 0;
+
+                let maxLevelWidth = 2400;
+                let enemyCount = 2;
+
+                if (difficulty === "medium") {
+                    maxLevelWidth = 4800;
+                    enemyCount = 5;
+                } else if (difficulty === "hard") {
+                    maxLevelWidth = 8000;
+                    enemyCount = 9;
+                }
+
+                basePlatforms.forEach(p => {
+                    if (p.x < maxLevelWidth) platforms.push({ ...p });
+                });
+
+                if (difficulty === "hard") {
+                    let currentX = 4900;
+                    while (currentX < maxLevelWidth - 300) {
+                        platforms.push({ x: currentX, y: Math.random() * 100 + 240, w: Math.random() * 60 + 70, h: 20 });
+                        currentX += Math.random() * 100 + 150;
+                    }
+                    platforms.push({ x: maxLevelWidth - 350, y: 230, w: 350, h: 220 });
+                }
+
+                let lastPlat = platforms[platforms.length - 1];
+                finishPortal.x = lastPlat.x + lastPlat.w - 150;
+                finishPortal.y = lastPlat.y - 100;
+
+                for (let i = 0; i < enemyCount; i++) {
+                    let spawn = baseEnemySpawns[i % baseEnemySpawns.length];
+                    let multiplier = Math.floor(i / baseEnemySpawns.length);
+                    let offset = multiplier * 2000;
+                    let finalX = spawn.x + offset;
+
+                    if (finalX < finishPortal.x - 200) {
+                        enemies.push({
+                            x: finalX, y: spawn.y, w: 34, h: 28, minX: spawn.minX + offset, maxX: spawn.maxX + offset,
+                            speed: 0.9 + Math.random() * 0.5, direction: 1, shootTimer: 100 + Math.random() * 80,
+                            animState: "walk", animTimer: 0, hp: difficulty === "hard" ? 3 : 2
+                        });
+                    }
+                }
+
+                platforms.forEach((p) => {
+                    let count = Math.floor(p.w / 35);
+                    for (let i = 0; i < count; i++) {
+                        grassTufts.push({ pX: p.x + Math.random() * (p.w - 15) + 5, pY: p.y, type: Math.floor(Math.random() * 3) });
+                    }
+                });
+            }
+
+            const ashParticles = [];
+            for (let i = 0; i < 55; i++) {
+                ashParticles.push({
+                    x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+                    size: Math.random() * 2.5 + 1, speedY: Math.random() * 0.4 + 0.2,
+                    speedX: (Math.random() - 0.5) * 0.3, alpha: Math.random() * 0.4 + 0.2,
+                    color: Math.random() > 0.4 ? "#7a7a85" : "#4a4a54"
+                });
+            }
+
+            function createFXExplosion(x, y, type) {
+                let count = type === "annihilation" ? 24 : 12;
+                if (type === "melee") count = 16;
+                if (type === "bossDeath") count = 80;
+                for (let i = 0; i < count; i++) {
+                    let angle = Math.random() * Math.PI * 2;
+                    let speed = type === "bossDeath" ? Math.random() * 6 + 1.5 : Math.random() * 3 + 1;
+                    let color = "#ff2222";
+                    if (type === "annihilation") {
+                        color = Math.random() > 0.5 ? "#ffffff" : "#ff2222";
+                    } else if (type === "melee") {
+                        color = "#ffffff";
+                        speed = Math.random() * 4 + 2;
+                    } else if (type === "bossDeath") {
+                        color = Math.random() > 0.45 ? "#ffffff" : "#9b2cff";
+                    }
+                    FXParticles.push({
+                        x: x, y: y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - (type === "splash" ? 1 : 0),
+                        radius: Math.random() * 2 + 0.8, alpha: 1.0, color: color, life: 15 + Math.random() * 15
+                    });
+                }
+            }
+
+            function startBossRoom() {
+                playMode = "boss";
+                platforms = [{ x: 0, y: bossRoom.floorY, w: canvas.width, h: canvas.height - bossRoom.floorY }];
+                grassTufts = [];
+                enemies = [];
+                enemyProjectiles.length = 0;
+                playerProjectiles.length = 0;
+                bossProjectiles.length = 0;
+                bossWaves.length = 0;
+                FXParticles.length = 0;
+                bossCrystal = null;
+                bossRoomLit = false;
+                victoryDelay = 0;
+                const settings = DIFFICULTY_SETTINGS[currentDifficulty];
+                const bossHeight = 88;
+                boss = {
+                    x: bossRoom.bossX,
+                    y: getBossHangY(bossHeight),
+                    w: 118,
+                    h: bossHeight,
+                    hp: settings.bossHp,
+                    maxHp: settings.bossHp,
+                    phase: "intro",
+                    timer: 120,
+                    attackTick: 0,
+                    vulnerable: false,
+                    dead: false,
+                    pulse: 0,
+                    deathTimer: 0,
+                    dripSeed: Math.random() * 100,
+                    rainFloorTick: 0
+                };
+                player.x = 80;
+                player.y = bossRoom.floorY - player.height;
+                player.vx = 0;
+                player.vy = 0;
+                player.lastSafeX = player.x;
+                player.lastSafeY = player.y;
+                player.invulnerableTimer = 60;
+                camera.x = 0;
+                updateUi();
+                startBossMusic();
+                startBossHeartbeat();
+                setBossHeartbeatActive(true);
+            }
+
+            function setBossPhase(phase) {
+                if (!boss || boss.dead) return;
+                const prevPhase = boss.phase;
+                boss.phase = phase;
+                boss.attackTick = 0;
+                boss.vulnerable = phase === "wave" || phase === "rest";
+                if (phase === "intro") boss.timer = 120;
+                else if (phase === "warnRain") boss.timer = 85;
+                else if (phase === "rain") {
+                    boss.timer = 230;
+                    playSound("bossRain");
+                } else if (phase === "warnWave") boss.timer = 180;
+                else if (phase === "wave") boss.timer = 420;
+                else if (phase === "rest") boss.timer = 240;
+
+                if (phase === "rest" && prevPhase !== "rest") {
+                    setBossHeartbeatActive(false);
+                    playSound("bossRest");
+                } else if (prevPhase === "rest" && phase !== "rest") {
+                    setBossHeartbeatActive(true);
+                }
+            }
+
+            function damageBoss(amount, x, y) {
+                if (!boss || boss.dead || !boss.vulnerable) return;
+                boss.hp = Math.max(0, boss.hp - amount);
+                createFXExplosion(x, y, "melee");
+                if (boss.hp <= 0) {
+                    boss.dead = true;
+                    boss.vulnerable = false;
+                    boss.deathTimer = 120;
+                    bossProjectiles.length = 0;
+                    bossWaves.length = 0;
+                    createFXExplosion(boss.x, boss.y + 12, "bossDeath");
+                    setBossHeartbeatActive(false);
+                    if (bossBgAudio) {
+                        bossBgAudio.pause();
+                        bossBgAudio = null;
+                    }
+                    playSound("bossDeath");
+                }
+            }
+
+            // ========== ИСПРАВЛЕННАЯ ФУНКЦИЯ СПАВНА КАПЕЛЬ ==========
+            // Капли появляются ТОЛЬКО слева и справа от безопасной зоны (над боссом их нет)
+            function spawnBossRain() {
+                if (!boss) return;
+                const drops = 3 + Math.floor(Math.random() * 3);
+                const safeHalf = getBossRainSafeHalfWidth();
+                const safeLeft = boss.x - safeHalf;
+                const safeRight = boss.x + safeHalf;
+                const leftBound = 0;
+                const rightBound = canvas.width;
+
+                for (let i = 0; i < drops; i++) {
+                    let x;
+                    // Выбираем случайно левую или правую часть
+                    if (Math.random() < 0.5) {
+                        // Левая часть
+                        if (safeLeft > leftBound) {
+                            x = leftBound + Math.random() * (safeLeft - leftBound);
+                        } else {
+                            // Если безопасная зона уходит за левый край – все капли справа
+                            x = safeRight + Math.random() * (rightBound - safeRight);
+                        }
+                    } else {
+                        // Правая часть
+                        if (safeRight < rightBound) {
+                            x = safeRight + Math.random() * (rightBound - safeRight);
+                        } else {
+                            // Если безопасная зона уходит за правый край – все капли слева
+                            x = leftBound + Math.random() * (safeLeft - leftBound);
+                        }
+                    }
+                    // Защита от undefined (если зона перекрывает весь экран – пропускаем)
+                    if (x === undefined || x < 0 || x > canvas.width) continue;
+
+                    bossProjectiles.push({
+                        x: x,
+                        y: -10 - Math.random() * 80,
+                        vx: (Math.random() - 0.5) * 0.8,
+                        vy: 1.2 + Math.random() * 0.8,
+                        radius: 4 + Math.random() * 2
+                    });
+                }
+            }
+
+            function spawnBossWaves() {
+                if (!boss) return;
+                const originY = bossRoom.floorY - 12;
+                bossWaves.push({ x: boss.x - 18, y: originY, vx: -2.45, radius: 10, life: 210 });
+                bossWaves.push({ x: boss.x + 18, y: originY, vx: 2.45, radius: 10, life: 210 });
+                playSound("bossWave");
+            }
+
+            window.addEventListener("keydown", (e) => {
+                initAudio();
+                if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
+                if (gameState !== "PLAYING") return;
+                KEYS[e.code] = true;
+                if ((e.code === "KeyW" || e.code === "Space") && !e.repeat) player.jumpBuffer = 8;
+                const flashCost = 6;
+                if (e.code === "ShiftLeft" && player.lightEnergy >= flashCost && !player.flashActive) {
+                    player.flashActive = true;
+                    player.flashRadius = 10;
+                    player.lightEnergy -= flashCost;
+                }
+            });
+
+            window.addEventListener("keyup", (e) => { KEYS[e.code] = false; });
+            canvas.addEventListener("contextmenu", e => e.preventDefault());
+
+            canvas.addEventListener("mousedown", (e) => {
+                initAudio();
+                if (gameState !== "PLAYING") return;
+                if (e.button === 0) playerShoot();
+                else if (e.button === 2) playerMeleeAttack();
+            });
+
+            function playerShoot() {
+                const shootCost = 18;
+                if (player.shootCooldown > 0 || player.meleeActive || player.lightEnergy < shootCost) return;
+                player.lightEnergy -= shootCost;
+                player.shootCooldown = 22;
+                playSound("playerShoot");
+                let startX = player.x + (player.direction === 1 ? player.width - 2 : 2);
+                let startY = player.y + 12;
+                playerProjectiles.push({ x: startX, y: startY, vx: player.direction * 7, radius: 4 });
+                player.muzzleFlashTimer = 8;
+                player.muzzleFlashX = startX;
+                player.muzzleFlashY = startY;
+                player.squishX = 0.88;
+                player.squishY = 1.08;
+            }
+
+            function playerMeleeAttack() {
+                const meleeCost = 6;
+                if (player.meleeActive || player.lightEnergy < meleeCost) return;
+                player.lightEnergy -= meleeCost;
+                player.meleeActive = true;
+                player.meleeTimer = player.meleeMaxTimer;
+                player.squishX = 1.14;
+                player.squishY = 0.92;
+
+                playSound("playerMelee");
+
+                let attackX = player.direction === 1 ? player.x + player.width : player.x - player.meleeRange;
+                let attackY = player.y;
+                let attackW = player.meleeRange;
+                let attackH = player.height;
+
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    let e = enemies[j];
+                    if (attackX < e.x + e.w && attackX + attackW > e.x && attackY < e.y + e.h && attackY + attackH > e.y) {
+                        e.hp = 0;
+                        playSound("enemyDeath");
+                        createFXExplosion(e.x + e.w / 2, e.y + e.h / 2, "melee");
+                        enemies.splice(j, 1);
+                    }
+                }
+                if (playMode === "boss" && boss && !boss.dead) {
+                    const bossLeft = boss.x - boss.w / 2;
+                    const bossTop = boss.y - boss.h / 2;
+                    if (attackX < bossLeft + boss.w && attackX + attackW > bossLeft && attackY < bossTop + boss.h && attackY + attackH > bossTop) {
+                        damageBoss(2, attackX + attackW / 2, attackY + attackH / 2);
+                    }
+                }
+                for (let k = enemyProjectiles.length - 1; k >= 0; k--) {
+                    let ep = enemyProjectiles[k];
+                    if (ep.x > attackX && ep.x < attackX + attackW && ep.y > attackY && ep.y < attackY + attackH) {
+                        createFXExplosion(ep.x, ep.y, "melee");
+                        enemyProjectiles.splice(k, 1);
+                    }
+                }
+            }
+
+            function damagePlayer(knockbackDir) {
+                if (player.invulnerableTimer > 0) return;
+                player.hearts = Math.max(0, player.hearts - 1);
+                player.hurtTimer = 18;
+                player.invulnerableTimer = 55;
+                player.vy = -3.6;
+                player.vx = knockbackDir * 4.2;
+                player.squishX = 1.28;
+                player.squishY = 0.78;
+                playSound("playerHurt");
+            }
+
+            function loseHeartAndRespawn() {
+                if (player.invulnerableTimer > 0) return;
+                player.hearts = Math.max(0, player.hearts - 1);
+                playSound("playerHurt");
+                if (player.hearts <= 0) {
+                    changeState("GAMEOVER", "You fell into the dark abyss.");
+                    return;
+                }
+                respawnAtSafePlatform();
+            }
+
+            function respawnAtSafePlatform() {
+                player.x = player.lastSafeX;
+                player.y = player.lastSafeY;
+                player.vx = 0;
+                player.vy = 0;
+                player.hurtTimer = 24;
+                player.invulnerableTimer = 90;
+                player.isGrounded = false;
+                player.squishX = 0.82;
+                player.squishY = 1.18;
+                camera.x = Math.max(0, player.x - canvas.width / 3);
+                enemyProjectiles.length = 0;
+            }
+
+            function changeState(newState, reason = "") {
+                gameState = newState;
+
+                document.getElementById("main-menu").classList.add("hidden");
+                document.getElementById("difficulty-menu").classList.add("hidden");
+                document.getElementById("game-over-screen").classList.add("hidden");
+                document.getElementById("victory-screen").classList.add("hidden");
+                document.getElementById("ui-container").classList.add("hidden");
+                document.getElementById("boss-ui").classList.add("hidden");
+
+                if (newState === "MENU") {
+                    document.getElementById("main-menu").classList.remove("hidden");
+                    playMode = "level";
+                    boss = null;
+                    bossCrystal = null;
+                    resumeBgMusic();
+                } else if (newState === "DIFFICULTY") {
+                    document.getElementById("difficulty-menu").classList.remove("hidden");
+                } else if (newState === "PLAYING") {
+                    document.getElementById("ui-container").classList.remove("hidden");
+                    playMode = "level";
+                    boss = null;
+                    bossCrystal = null;
+                    bossRoomLit = false;
+                    buildLevel(currentDifficulty);
+                    resetPlayer();
+                    resumeBgMusic();
+                } else if (newState === "GAMEOVER") {
+                    document.getElementById("game-over-screen").classList.remove("hidden");
+                    document.getElementById("fail-reason").innerText = reason;
+                    stopBgMusic();
+                    playSound("defeat");
+                } else if (newState === "VICTORY") {
+                    document.getElementById("victory-screen").classList.remove("hidden");
+                    stopBgMusic();
+                    playSound("victory");
+                }
+            }
+
+            function resetPlayer() {
+                let firstPlatform = platforms[0] || { x: 0, y: 350 };
+                const settings = DIFFICULTY_SETTINGS[currentDifficulty];
+
+                player.x = firstPlatform.x + 30;
+                player.y = firstPlatform.y - player.height - 20;
+                player.lastSafeX = player.x;
+                player.lastSafeY = firstPlatform.y - player.height;
+
+                player.vx = 0;
+                player.vy = 0;
+                player.maxHearts = settings.hearts;
+                player.hearts = player.maxHearts;
+                player.lightEnergy = 100;
+                player.hurtTimer = 0;
+                player.invulnerableTimer = 0;
+                player.shootCooldown = 0;
+                player.muzzleFlashTimer = 0;
+                player.meleeActive = false;
+                player.isGrounded = false;
+                player.coyoteTimer = 0;
+                player.jumpBuffer = 0;
+                player.squishX = 1;
+                player.squishY = 1;
+                camera.x = 0;
+                renderHearts();
+            }
+
+            document.getElementById("btn-to-difficulty").addEventListener("click", () => { initAudio(); changeState("DIFFICULTY"); });
+            document.getElementById("btn-back-to-menu").addEventListener("click", () => { changeState("MENU"); });
+            document.getElementById("btn-restart-fail").addEventListener("click", () => { changeState("PLAYING"); });
+            document.getElementById("btn-restart-run").addEventListener("click", () => { changeState("PLAYING"); });
+            document.getElementById("btn-to-menu").addEventListener("click", () => { stopBossAudio(); changeState("MENU"); });
+            document.getElementById("btn-toggle-music").addEventListener("click", () => { initAudio(); toggleMusic(); });
+
+            document.querySelectorAll(".btn-go-menu").forEach(b => {
+                b.addEventListener("click", () => { changeState("MENU"); });
+            });
+
+            document.querySelectorAll(".diff-btn").forEach(b => {
+                b.addEventListener("click", () => {
+                    currentDifficulty = b.getAttribute("data-diff");
+                    changeState("PLAYING");
+                });
+            });
+
+            function approach(current, target, step) {
+                if (current < target) return Math.min(target, current + step);
+                if (current > target) return Math.max(target, current - step);
+                return target;
+            }
+
+            function updateBoss(step) {
+                if (playMode !== "boss" || !boss) return;
+
+                document.getElementById("boss-ui").classList.remove("hidden");
+                boss.pulse += 0.06 * step;
+
+                if (boss.dead) {
+                    boss.deathTimer -= step;
+                    if (boss.deathTimer > 0 && Math.floor(boss.deathTimer) % 8 === 0) {
+                        createFXExplosion(boss.x + (Math.random() - 0.5) * boss.w, boss.y + (Math.random() - 0.5) * boss.h, "bossDeath");
+                    }
+                    if (boss.deathTimer <= 0 && !bossCrystal) {
+                        bossCrystal = { x: boss.x, y: bossRoom.floorY - 36, radius: 12, taken: false, pulse: 0 };
+                    }
+                    return;
+                }
+
+                boss.timer -= step;
+                boss.attackTick -= step;
+
+                if (boss.phase === "intro") {
+                    if (boss.timer <= 0) setBossPhase("warnRain");
+                    return;
+                }
+
+                if (boss.phase === "warnRain") {
+                    if (boss.timer <= 0) setBossPhase("rain");
+                } else if (boss.phase === "rain") {
+                    if (boss.attackTick <= 0) {
+                        spawnBossRain();
+                        boss.attackTick = 5;
+                    }
+                    // Урон от пола УБРАН полностью
+                    if (boss.timer <= 0) setBossPhase("warnWave");
+                } else if (boss.phase === "warnWave") {
+                    if (boss.timer <= 0) setBossPhase("wave");
+                } else if (boss.phase === "wave") {
+                    if (boss.attackTick <= 0) {
+                        spawnBossWaves();
+                        boss.attackTick = 62;
+                    }
+                    if (boss.timer <= 0) setBossPhase("rest");
+                } else if (boss.phase === "rest") {
+                    if (boss.timer <= 0) setBossPhase("warnRain");
+                }
+            }
+
+            function updateBossHazards(step) {
+                for (let i = bossProjectiles.length - 1; i >= 0; i--) {
+                    const proj = bossProjectiles[i];
+                    proj.vy += 0.08 * step;
+                    proj.x += proj.vx * step;
+                    proj.y += proj.vy * step;
+
+                    // Если капля в безопасной зоне – удаляем (но теперь их там нет, оставляем на всякий)
+                    if (boss.phase === "rain") {
+                        const inSafeColumn = Math.abs(proj.x - boss.x) < getBossRainSafeHalfWidth();
+                        if (inSafeColumn && proj.y > boss.y - 10) {
+                            if (proj.y >= bossRoom.floorY - 4) {
+                                bossProjectiles.splice(i, 1);
+                                continue;
+                            }
+                        }
+                    }
+
+                    // Столкновение с игроком
+                    if (proj.x > player.x && proj.x < player.x + player.width && proj.y > player.y && proj.y < player.y + player.height) {
+                        // Если игрок в безопасной зоне – капля не наносит урон
+                        if (boss.phase === "rain" && isPlayerInBossRainSafeZone()) {
+                            bossProjectiles.splice(i, 1);
+                            continue;
+                        }
+                        damagePlayer(proj.x > player.x ? -1 : 1);
+                        bossProjectiles.splice(i, 1);
+                        continue;
+                    }
+                    // Если капля упала за пределы или на пол – удаляем
+                    if (proj.y > bossRoom.floorY - 2 || proj.x < -30 || proj.x > canvas.width + 30) {
+                        if (proj.y >= bossRoom.floorY - 6 && boss && boss.phase === "rain") {
+                            const inSafe = Math.abs(proj.x - boss.x) < getBossRainSafeHalfWidth();
+                            if (!inSafe) createFXExplosion(proj.x, bossRoom.floorY, "splash");
+                        } else {
+                            createFXExplosion(proj.x, Math.min(proj.y, bossRoom.floorY), "splash");
+                        }
+                        bossProjectiles.splice(i, 1);
+                    }
+                }
+
+                // Волны
+                for (let i = bossWaves.length - 1; i >= 0; i--) {
+                    const wave = bossWaves[i];
+                    wave.x += wave.vx * step;
+                    wave.life -= step;
+                    const playerFeet = player.y + player.height;
+                    const horizontalHit = Math.abs((player.x + player.width / 2) - wave.x) < wave.radius + player.width / 2;
+                    const verticalHit = playerFeet > wave.y - 24 && player.y < wave.y + 20;
+                    if (horizontalHit && verticalHit) damagePlayer(wave.vx > 0 ? 1 : -1);
+                    if (wave.life <= 0 || wave.x < -40 || wave.x > canvas.width + 40) bossWaves.splice(i, 1);
+                }
+            }
+
+            function update(dt) {
+                if (gameState !== "PLAYING") return;
+
+                const step = Math.min(dt / 16.6667, 2);
+                player.squishX += (1 - player.squishX) * 0.11 * step;
+                player.squishY += (1 - player.squishY) * 0.11 * step;
+                if (player.hurtTimer > 0) player.hurtTimer -= step;
+                if (player.invulnerableTimer > 0) player.invulnerableTimer -= step;
+                if (player.shootCooldown > 0) player.shootCooldown -= step;
+                if (player.muzzleFlashTimer > 0) player.muzzleFlashTimer -= step;
+                if (player.jumpBuffer > 0) player.jumpBuffer -= step;
+                if (player.coyoteTimer > 0) player.coyoteTimer -= step;
+                if (player.meleeActive) {
+                    player.meleeTimer -= step;
+                    if (player.meleeTimer <= 0) player.meleeActive = false;
+                }
+
+                if (player.hurtTimer < 10) {
+                    let moveInput = 0;
+                    if (KEYS["KeyA"] || KEYS["ArrowLeft"]) moveInput -= 1;
+                    if (KEYS["KeyD"] || KEYS["ArrowRight"]) moveInput += 1;
+
+                    if (moveInput !== 0) {
+                        player.direction = moveInput;
+                        let accel = (player.isGrounded ? player.acceleration : player.airAcceleration) * step;
+                        player.vx = approach(player.vx, moveInput * player.speed, accel);
+                    } else {
+                        let friction = Math.pow(player.isGrounded ? player.friction : player.airFriction, step);
+                        player.vx *= friction;
+                        if (Math.abs(player.vx) < 0.05) player.vx = 0;
+                    }
+                }
+
+                player.vy = Math.min(player.maxFallSpeed, player.vy + player.gravity * step);
+                if (player.jumpBuffer > 0 && (player.isGrounded || player.coyoteTimer > 0) && player.hurtTimer < 10) {
+                    player.vy = player.jumpForce;
+                    player.isGrounded = false;
+                    player.coyoteTimer = 0;
+                    player.jumpBuffer = 0;
+                    player.squishX = 0.76;
+                    player.squishY = 1.24;
+                }
+
+                let oldX = player.x;
+                let oldY = player.y;
+                player.x += player.vx * step;
+                player.y += player.vy * step;
+
+                if (player.x < 0) player.x = 0;
+                if (playMode === "boss") {
+                    player.x = Math.max(bossRoom.leftWall, Math.min(player.x, bossRoom.rightWall - player.width));
+                    camera.x = 0;
+                } else {
+                    let targetCameraX = Math.max(0, player.x - canvas.width / 3);
+                    camera.x += (targetCameraX - camera.x) * 0.12 * step;
+                }
+
+                let regenAmount = (Math.abs(player.vx) < 0.1 ? 0.07 : 0.035) * step;
+                if (!player.flashActive && player.lightEnergy < player.maxLightEnergy) {
+                    player.lightEnergy = Math.min(player.maxLightEnergy, player.lightEnergy + regenAmount);
+                }
+
+                if (player.flashActive) {
+                    player.flashRadius += 22 * step;
+                    if (player.flashRadius >= 980) player.flashActive = false;
+                }
+
+                player.isGrounded = false;
+                platforms.forEach(p => {
+                    if (player.x < p.x + p.w && player.x + player.width > p.x && player.y < p.y + p.h && player.y + player.height > p.y) {
+                        if (oldY + player.height <= p.y) {
+                            player.y = p.y - player.height;
+                            player.vy = 0;
+                            player.isGrounded = true;
+                            player.coyoteTimer = 7;
+                            player.lastSafeX = Math.max(p.x + 10, Math.min(player.x, p.x + p.w - player.width - 10));
+                            player.lastSafeY = p.y - player.height;
+                        } else if (oldX + player.width <= p.x) {
+                            player.x = p.x - player.width;
+                            player.vx = 0;
+                        } else if (oldX >= p.x + p.w) {
+                            player.x = p.x + p.w;
+                            player.vx = 0;
+                        } else if (oldY >= p.y + p.h) {
+                            player.y = p.y + p.h;
+                            player.vy = Math.max(0, player.vy);
+                        }
+                    }
+                });
+
+                if (playMode === "boss") {
+                    updateBoss(step);
+                    updateBossHazards(step);
+                }
+
+                enemies.forEach(e => {
+                    if (e.animState === "walk") {
+                        e.x += e.speed * e.direction * step;
+                        if (e.x <= e.minX || e.x + e.w >= e.maxX) e.direction *= -1;
+                        e.shootTimer -= step;
+                        if (e.shootTimer <= 0 && Math.abs(player.x - e.x) < 320) {
+                            e.animState = "charge";
+                            e.animTimer = 25;
+                        }
+                    } else if (e.animState === "charge") {
+                        e.animTimer -= step;
+                        if (e.animTimer <= 0) {
+                            e.animState = "spit";
+                            e.animTimer = 10;
+                            let spitDir = player.x > e.x ? 1 : -1;
+                            e.direction = spitDir;
+                            playSound("enemyAttack");
+                            enemyProjectiles.push({ x: e.x + e.w / 2, y: e.y + 4, vx: spitDir * 5.5, vy: -4, radius: 5 });
+                            e.shootTimer = 120 + Math.random() * 60;
+                        }
+                    } else if (e.animState === "spit") {
+                        e.animTimer -= step;
+                        if (e.animTimer <= 0) e.animState = "walk";
+                    }
+
+                    if (player.x < e.x + e.w && player.x + player.width > e.x && player.y < e.y + e.h && player.y + player.height > e.y) {
+                        damagePlayer(player.x > e.x ? 1 : -1);
+                    }
+                });
+
+                for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
+                    let proj = enemyProjectiles[i];
+                    proj.vy += 0.15 * step;
+                    proj.x += proj.vx * step;
+                    proj.y += proj.vy * step;
+                    if (proj.x > player.x && proj.x < player.x + player.width && proj.y > player.y && proj.y < player.y + player.height) {
+                        damagePlayer(proj.vx > 0 ? 1 : -1);
+                        enemyProjectiles.splice(i, 1);
+                        continue;
+                    }
+                    let hitFloor = false;
+                    platforms.forEach(p => {
+                        if (proj.x > p.x && proj.x < p.x + p.w && proj.y > p.y && proj.y < p.y + p.h) hitFloor = true;
+                    });
+                    if (hitFloor || proj.y > canvas.height + 50) {
+                        if (hitFloor) createFXExplosion(proj.x, proj.y, "splash");
+                        enemyProjectiles.splice(i, 1);
+                    }
+                }
+
+                for (let i = playerProjectiles.length - 1; i >= 0; i--) {
+                    let pProj = playerProjectiles[i];
+                    pProj.x += pProj.vx * step;
+                    let destroyed = false;
+                    for (let j = enemies.length - 1; j >= 0; j--) {
+                        let e = enemies[j];
+                        if (pProj.x > e.x && pProj.x < e.x + e.w && pProj.y > e.y && pProj.y < e.y + e.h) {
+                            e.hp--;
+                            destroyed = true;
+                            createFXExplosion(pProj.x, pProj.y, "splash");
+                            if (e.hp <= 0) {
+                                playSound("enemyDeath");
+                                enemies.splice(j, 1);
+                            }
+                            break;
+                        }
+                    }
+                    if (playMode === "boss" && boss && !boss.dead) {
+                        const bossLeft = boss.x - boss.w / 2;
+                        const bossTop = boss.y - boss.h / 2;
+                        if (pProj.x > bossLeft && pProj.x < bossLeft + boss.w && pProj.y > bossTop && pProj.y < bossTop + boss.h) {
+                            damageBoss(1, pProj.x, pProj.y);
+                            destroyed = true;
+                        }
+                    }
+                    for (let k = enemyProjectiles.length - 1; k >= 0; k--) {
+                        let eProj = enemyProjectiles[k];
+                        let dist = Math.sqrt((pProj.x - eProj.x) ** 2 + (pProj.y - eProj.y) ** 2);
+                        if (dist < pProj.radius + eProj.radius) {
+                            createFXExplosion((pProj.x + eProj.x) / 2, (pProj.y + eProj.y) / 2, "annihilation");
+                            enemyProjectiles.splice(k, 1);
+                            destroyed = true;
+                            break;
+                        }
+                    }
+                    platforms.forEach(p => {
+                        if (pProj.x > p.x && pProj.x < p.x + p.w && pProj.y > p.y && pProj.y < p.y + p.h) destroyed = true;
+                    });
+                    if (destroyed || Math.abs(pProj.x - player.x) > canvas.width) playerProjectiles.splice(i, 1);
+                }
+
+                for (let i = FXParticles.length - 1; i >= 0; i--) {
+                    let f = FXParticles[i];
+                    f.x += f.vx * step;
+                    f.y += f.vy * step;
+                    f.life -= step;
+                    f.alpha = f.life / 30;
+                    if (f.life <= 0) FXParticles.splice(i, 1);
+                }
+
+                if (bossCrystal && !bossCrystal.taken) {
+                    bossCrystal.pulse += 0.08 * step;
+                    const dx = (player.x + player.width / 2) - bossCrystal.x;
+                    const dy = (player.y + player.height / 2) - bossCrystal.y;
+                    if (Math.sqrt(dx * dx + dy * dy) < 34) {
+                        bossCrystal.taken = true;
+                        bossRoomLit = true;
+                        victoryDelay = 90;
+                        createFXExplosion(bossCrystal.x, bossCrystal.y, "annihilation");
+                        playSound("victory");
+                    }
+                }
+
+                if (victoryDelay > 0) {
+                    victoryDelay -= step;
+                    if (victoryDelay <= 0) changeState("VICTORY");
+                }
+
+                if (player.y > canvas.height + 90) {
+                    if (playMode === "boss") respawnAtSafePlatform();
+                    else loseHeartAndRespawn();
+                }
+                if (player.hearts <= 0) changeState("GAMEOVER", "The devourers consumed your light.");
+                if (playMode === "level" && player.x + player.width > finishPortal.x && player.y + player.height > finishPortal.y && player.y < finishPortal.y + finishPortal.h) {
+                    startBossRoom();
+                }
+
+                updateUi();
+            }
+
+            function renderHearts() {
+                const hearts = document.getElementById("hearts-container");
+                if (!hearts) return;
+                hearts.innerHTML = "";
+                for (let i = 0; i < player.maxHearts; i++) {
+                    const heart = document.createElement("span");
+                    heart.className = "heart" + (i >= player.hearts ? " empty" : "");
+                    heart.innerHTML = HEART_ENTITY;
+                    hearts.appendChild(heart);
+                }
+            }
+
+            function updateUi() {
+                const lightBar = document.getElementById("light-bar");
+                const progText = document.getElementById("progress-text");
+                const bossUi = document.getElementById("boss-ui");
+                const bossHpBar = document.getElementById("boss-hp-bar");
+                const bossPhaseText = document.getElementById("boss-phase-text");
+                renderHearts();
+                if (lightBar) lightBar.style.width = player.lightEnergy + "%";
+                if (progText) {
+                    if (playMode === "boss") {
+                        progText.innerText = "BOSS ROOM";
+                    } else {
+                        let meters = Math.floor(player.x / 8);
+                        let targetMeters = Math.floor(finishPortal.x / 8);
+                        progText.innerText = Math.min(targetMeters, meters) + "m / " + targetMeters + "m";
+                    }
+                }
+                if (bossUi) bossUi.classList.toggle("hidden", playMode !== "boss" || !boss);
+                if (bossHpBar && boss) bossHpBar.style.width = Math.max(0, (boss.hp / boss.maxHp) * 100) + "%";
+                if (bossPhaseText && boss) {
+                    const phaseNames = {
+                        intro: "THE HEART STIRS...",
+                        warnRain: "THE HEART DRAWS IN DARKNESS",
+                        rain: "DARK RAIN: STAND BENEATH IT",
+                        warnWave: "THE HEART BEATS BELOW",
+                        wave: "SOUND WAVES: JUMP AND STRIKE",
+                        rest: "EXHAUSTED: STRIKE HARD"
+                    };
+                    bossPhaseText.innerText = boss.dead ? "THE HEART IS BREAKING" : phaseNames[boss.phase];
+                }
+            }
+
+            function checkPointInLight(tx, ty) {
+                let eyeX = player.x + (player.direction === 1 ? player.width - 4 : 4);
+                let eyeY = player.y + 10;
+                let dx = tx - eyeX;
+                let dy = ty - eyeY;
+                let distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance <= player.lightRange) {
+                    let targetAngle = Math.atan2(dy, dx);
+                    let viewAngle = player.direction === 1 ? 0 : Math.PI;
+                    let angleDiff = Math.abs(targetAngle - viewAngle);
+                    if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+                    if (angleDiff < player.lightAngle) return true;
+                }
+                return Math.sqrt((tx - (player.x + player.width / 2)) ** 2 + (ty - (player.y + player.height / 2)) ** 2) < 65;
+            }
+
+            function drawBoss() {
+                if (!boss) return;
+                if (boss.dead && boss.deathTimer <= 0) return;
+
+                const pulse = Math.sin(boss.pulse) * 0.05;
+                let scaleX = 1 + pulse;
+                let scaleY = 1 - pulse * 0.7;
+                let glow = "#8b0a1a";
+                if (boss.phase === "warnRain") {
+                    scaleX += Math.sin(lastTime / 70) * 0.07;
+                    scaleY -= Math.sin(lastTime / 70) * 0.04;
+                    glow = "#c41e3a";
+                } else if (boss.phase === "warnWave") {
+                    scaleX += Math.sin(lastTime / 45) * 0.1;
+                    glow = "#ff1a3d";
+                } else if (boss.phase === "rest") {
+                    scaleY *= 0.78;
+                    scaleX *= 1.14;
+                    glow = "#5c0610";
+                }
+
+                const bx = boss.x;
+                const by = boss.y;
+                const w = boss.w;
+                const h = boss.h;
+
+                ctx.save();
+                ctx.translate(bx, by);
+                ctx.scale(scaleX, scaleY);
+
+                if (!boss.vulnerable) {
+                    const shieldPulse = Math.sin(lastTime / 50) * 0.07;
+                    const shieldR = Math.max(w, h) * 0.5;
+                    const shieldGrad = ctx.createRadialGradient(0, 0, shieldR * 0.25, 0, 0, shieldR);
+                    shieldGrad.addColorStop(0, "rgba(255, 70, 100, 0.02)");
+                    shieldGrad.addColorStop(0.65, "rgba(200, 30, 60, 0.08)");
+                    shieldGrad.addColorStop(1, "rgba(140, 10, 35, 0.15)");
+                    ctx.fillStyle = shieldGrad;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, shieldR * (1 + shieldPulse), 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = `rgba(255, 120, 150, ${0.3 + Math.sin(lastTime / 35) * 0.15})`;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, shieldR * (1 + shieldPulse), 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                ctx.shadowBlur = boss.vulnerable ? 28 : 16;
+                ctx.shadowColor = glow;
+
+                ctx.strokeStyle = "rgba(90, 8, 18, 0.85)";
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(-8, -h / 2 - 6);
+                ctx.quadraticCurveTo(-14, -h / 2 - 28, -4, -h / 2 - 42);
+                ctx.moveTo(10, -h / 2 - 4);
+                ctx.quadraticCurveTo(18, -h / 2 - 22, 6, -h / 2 - 36);
+                ctx.stroke();
+
+                ctx.fillStyle = "#4a0812";
+                ctx.beginPath();
+                ctx.moveTo(-7, -h / 2 + 2);
+                ctx.lineTo(7, -h / 2 + 2);
+                ctx.lineTo(5, -h / 2 - 22);
+                ctx.lineTo(-5, -h / 2 - 22);
+                ctx.closePath();
+                ctx.fill();
+
+                const heartGrad = ctx.createRadialGradient(-8, -4, 8, 0, 6, w * 0.55);
+                heartGrad.addColorStop(0, boss.vulnerable ? "#6b1020" : "#3d0810");
+                heartGrad.addColorStop(0.55, "#7a1424");
+                heartGrad.addColorStop(1, "#1a0408");
+                ctx.fillStyle = heartGrad;
+                ctx.beginPath();
+                ctx.moveTo(0, h / 2 - 4);
+                ctx.bezierCurveTo(-w * 0.42, h * 0.28, -w * 0.48, -h * 0.08, -w * 0.34, -h * 0.32);
+                ctx.bezierCurveTo(-w * 0.28, -h * 0.44, -w * 0.1, -h * 0.38, 0, -h * 0.22);
+                ctx.bezierCurveTo(w * 0.1, -h * 0.38, w * 0.28, -h * 0.44, w * 0.34, -h * 0.32);
+                ctx.bezierCurveTo(w * 0.48, -h * 0.08, w * 0.42, h * 0.28, 0, h / 2 - 4);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.strokeStyle = "rgba(20, 2, 6, 0.9)";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(0, -h * 0.18);
+                ctx.quadraticCurveTo(3, h * 0.08, 0, h / 2 - 10);
+                ctx.moveTo(-w * 0.18, -h * 0.05);
+                ctx.quadraticCurveTo(-w * 0.22, h * 0.18, -w * 0.12, h * 0.32);
+                ctx.moveTo(w * 0.18, -h * 0.05);
+                ctx.quadraticCurveTo(w * 0.22, h * 0.18, w * 0.12, h * 0.32);
+                ctx.stroke();
+
+                ctx.strokeStyle = "#9b1a2e";
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(-w * 0.2, -h * 0.35);
+                ctx.quadraticCurveTo(-w * 0.38, -h * 0.42, -w * 0.3, -h * 0.52);
+                ctx.moveTo(w * 0.15, -h * 0.33);
+                ctx.quadraticCurveTo(w * 0.32, -h * 0.4, w * 0.26, -h * 0.5);
+                ctx.stroke();
+
+                ctx.strokeStyle = "rgba(180, 30, 50, 0.45)";
+                ctx.lineWidth = 1;
+                for (let i = 0; i < 6; i++) {
+                    const angle = -Math.PI / 2 + (i - 2.5) * 0.35;
+                    const len = 14 + (i % 2) * 8;
+                    ctx.beginPath();
+                    ctx.moveTo(Math.cos(angle) * 6, Math.sin(angle) * 6 - 4);
+                    ctx.lineTo(Math.cos(angle) * len, Math.sin(angle) * len - 2);
+                    ctx.stroke();
+                }
+
+                ctx.fillStyle = "rgba(255, 80, 100, 0.12)";
+                ctx.beginPath();
+                ctx.ellipse(-w * 0.14, -h * 0.08, w * 0.16, h * 0.14, -0.4, 0, Math.PI * 2);
+                ctx.fill();
+
+                const eyePulse = boss.phase === "rain" ? Math.sin(lastTime / 80) * 1.5 : 0;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = "#ff2244";
+                ctx.fillStyle = "#ffe8ec";
+                ctx.beginPath();
+                ctx.ellipse(0, -h * 0.06 + eyePulse, 11, 13, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = "#1a0008";
+                ctx.beginPath();
+                ctx.ellipse(2, -h * 0.05 + eyePulse, 5, 7, 0.2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = "#ff1133";
+                ctx.beginPath();
+                ctx.arc(4, -h * 0.07 + eyePulse, 1.8, 0, Math.PI * 2);
+                ctx.fill();
+
+                const dripPhase = (lastTime / 120 + boss.dripSeed) % 1;
+                ctx.fillStyle = "rgba(160, 10, 30, 0.85)";
+                for (let d = 0; d < 3; d++) {
+                    const dripX = -w * 0.22 + d * w * 0.22;
+                    const dripY = h / 2 - 6 + dripPhase * 18 + d * 5;
+                    ctx.beginPath();
+                    ctx.ellipse(dripX, dripY, 2.2, 4 + dripPhase * 3, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+                ctx.shadowBlur = 0;
+
+                if (boss.phase === "warnRain" || boss.phase === "warnWave") {
+                    ctx.strokeStyle = boss.phase === "warnRain" ? "rgba(196, 30, 58, 0.55)" : "rgba(255, 26, 61, 0.65)";
+                    ctx.lineWidth = 2;
+                    const r = boss.phase === "warnRain" ? 52 + Math.sin(lastTime / 60) * 8 : 74 + Math.sin(lastTime / 45) * 12;
+                    ctx.beginPath();
+                    ctx.arc(bx, by, r, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+
+            function drawRainFloorOverlay() {
+                if (!boss || boss.phase !== "rain") return;
+
+                const safeHalf = getBossRainSafeHalfWidth();
+                const safeLeft = boss.x - safeHalf;
+                const safeRight = boss.x + safeHalf;
+                const floorH = canvas.height - bossRoom.floorY;
+                const flicker = 0.28 + Math.sin(lastTime / 90) * 0.08;
+
+                ctx.fillStyle = `rgba(170, 18, 42, 0.02)`;
+                ctx.fillRect(0, bossRoom.floorY, safeLeft, floorH);
+                ctx.fillRect(safeRight, bossRoom.floorY, canvas.width - safeRight, floorH);
+
+                ctx.fillStyle = "rgba(255, 60, 90, 0.04)";
+                for (let i = 0; i < 18; i++) {
+                    const sx = (i * 97 + lastTime * 0.4) % canvas.width;
+                    if (sx > safeLeft && sx < safeRight) continue;
+                    ctx.fillRect(sx, bossRoom.floorY + ((i * 31) % floorH), 1, 3 + (i % 3) * 2);
+                }
+
+                ctx.fillStyle = "rgba(255, 255, 255, 0.03)";
+                ctx.fillRect(safeLeft, bossRoom.floorY, safeRight - safeLeft, floorH);
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+                ctx.lineWidth = 1;
+                ctx.strokeRect(safeLeft, bossRoom.floorY, safeRight - safeLeft, floorH);
+            }
+
+            function drawBossHazards() {
+                drawRainFloorOverlay();
+
+                bossProjectiles.forEach(proj => {
+                    ctx.fillStyle = "#ff244e";
+                    ctx.shadowBlur = 12;
+                    ctx.shadowColor = "#ff244e";
+                    ctx.beginPath();
+                    ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                });
+
+                bossWaves.forEach(wave => {
+                    ctx.strokeStyle = "rgba(120, 220, 255, 0.92)";
+                    ctx.lineWidth = 5;
+                    ctx.shadowBlur = 12;
+                    ctx.shadowColor = "#7ce6ff";
+                    ctx.beginPath();
+                    ctx.arc(wave.x, wave.y, wave.radius + Math.sin(lastTime / 70) * 2, Math.PI, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                });
+
+                if (bossCrystal && !bossCrystal.taken) {
+                    const pulse = Math.sin(bossCrystal.pulse) * 4;
+                    ctx.save();
+                    ctx.translate(bossCrystal.x, bossCrystal.y);
+                    ctx.rotate(lastTime / 900);
+                    ctx.fillStyle = "#ffffff";
+                    ctx.shadowBlur = 24 + pulse;
+                    ctx.shadowColor = "#f2c94c";
+                    ctx.beginPath();
+                    ctx.moveTo(0, -18);
+                    ctx.lineTo(13, 0);
+                    ctx.lineTo(0, 18);
+                    ctx.lineTo(-13, 0);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = bossRoomLit ? "#dfeeff" : "#0a0a14";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = bossRoomLit ? "#bdd2f4" : "#0a0a14";
+                for (let i = 0; i < 30; i++) {
+                    ctx.fillRect(150 + i * 200 - camera.x * 0.2, 50, 40, 400);
+                }
+
+                ctx.save();
+                ctx.translate(-camera.x, 0);
+
+                if (gameState === "PLAYING") {
+                    platforms.forEach(p => {
+                        let illumb = playerProjectiles.some(bp => bp.x > p.x - 60 && bp.x < p.x + p.w + 60 && bp.y > p.y - 40 && bp.y < p.y + p.h + 40);
+                        let illumE = enemyProjectiles.some(ep => ep.x > p.x - 70 && ep.x < p.x + p.w + 70 && ep.y > p.y - 50 && ep.y < p.y + p.h + 50);
+                        if (playMode === "boss" || bossRoomLit || checkPointInLight(p.x + p.w / 2, p.y + p.h / 2) || checkPointInLight(p.x, p.y) || checkPointInLight(p.x + p.w, p.y) || player.flashActive || illumb || illumE) {
+                            ctx.fillStyle = bossRoomLit ? "#64748b" : "#22222e";
+                            ctx.fillRect(p.x, p.y, p.w, p.h);
+                            ctx.fillStyle = bossRoomLit ? "#e8f4ff" : "#545463";
+                            ctx.fillRect(p.x, p.y, p.w, 3);
+                        }
+                    });
+
+                    grassTufts.forEach(g => {
+                        if (checkPointInLight(g.pX, g.pY) || player.flashActive) {
+                            ctx.fillStyle = "#6e6e80";
+                            ctx.save();
+                            ctx.translate(g.pX, g.pY);
+                            if (g.type === 0) {
+                                ctx.fillRect(0, -4, 3, 4);
+                                ctx.fillRect(-3, -6, 2, 6);
+                                ctx.fillRect(4, -5, 2, 5);
+                            } else if (g.type === 1) {
+                                ctx.fillRect(0, -8, 3, 8);
+                                ctx.fillRect(-2, -8, 2, 3);
+                            } else {
+                                ctx.fillRect(-1, -3, 3, 3);
+                                ctx.fillRect(3, -4, 2, 4);
+                            }
+                            ctx.restore();
+                        }
+                    });
+
+                    if (playMode === "level") {
+                        ctx.fillStyle = "#ffffff";
+                        ctx.shadowBlur = 20;
+                        ctx.shadowColor = "#ffffff";
+                        ctx.fillRect(finishPortal.x, finishPortal.y, finishPortal.w, finishPortal.h);
+                        ctx.shadowBlur = 0;
+                    }
+
+                    enemies.forEach(e => {
+                        if (checkPointInLight(e.x + e.w / 2, e.y + e.h / 2) || player.flashActive) {
+                            ctx.fillStyle = (e.hp === 1 && Math.floor(lastTime / 100) % 2 === 0) ? "#444466" : "#181826";
+                            ctx.save();
+                            ctx.translate(e.x + e.w / 2, e.y + e.h);
+                            let esx = 1;
+                            let esy = 1;
+                            if (e.animState === "charge") {
+                                esy = 0.5 + (e.animTimer / 25) * 0.5;
+                                esx = 1.3 - (e.animTimer / 25) * 0.3;
+                            } else if (e.animState === "spit") {
+                                esy = 1.4;
+                                esx = 0.7;
+                            }
+                            ctx.scale(esx, esy);
+                            ctx.fillRect(-e.w / 2, -e.h, e.w, e.h);
+                            ctx.restore();
+                        }
+                    });
+
+                    enemyProjectiles.forEach(proj => {
+                        ctx.fillStyle = "#ff2222";
+                        ctx.shadowBlur = 10;
+                        ctx.shadowColor = "#ff2222";
+                        ctx.beginPath();
+                        ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                    });
+
+                    playerProjectiles.forEach(pProj => {
+                        ctx.fillStyle = "#ffffff";
+                        ctx.shadowBlur = 12;
+                        ctx.shadowColor = "#00ccff";
+                        ctx.beginPath();
+                        ctx.arc(pProj.x, pProj.y, pProj.radius, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                    });
+
+                    FXParticles.forEach(f => {
+                        ctx.fillStyle = f.color;
+                        ctx.globalAlpha = f.alpha;
+                        ctx.beginPath();
+                        ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.globalAlpha = 1.0;
+                    });
+
+                    ctx.save();
+                    ctx.translate(player.x + player.width / 2, player.y + player.height);
+                    ctx.scale(player.squishX, player.squishY);
+                    const hurtFlash = player.invulnerableTimer > 0 && Math.floor(player.invulnerableTimer / 5) % 2 === 0;
+                    ctx.fillStyle = hurtFlash ? "#ff4444" : "#020205";
+                    ctx.fillRect(-player.width / 2, -player.height, player.width, player.height);
+                    ctx.fillRect(-player.width / 2 + 2, -player.height - 6, 4, 6);
+                    ctx.fillRect(player.width / 2 - 6, -player.height - 6, 4, 6);
+                    ctx.restore();
+
+                    if (player.muzzleFlashTimer > 0) {
+                        ctx.strokeStyle = `rgba(255, 255, 255, ${player.muzzleFlashTimer / 8})`;
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.arc(player.muzzleFlashX, player.muzzleFlashY, 15 - player.muzzleFlashTimer, -0.4 * player.direction, 0.4 * player.direction, player.direction === -1);
+                        ctx.stroke();
+                    }
+
+                    if (player.meleeActive) {
+                        ctx.save();
+                        let swordX = player.x + (player.direction === 1 ? player.width + 10 : -10);
+                        let swordY = player.y + player.height / 2;
+                        ctx.translate(swordX, swordY);
+                        ctx.scale(player.direction, 1);
+                        let progress = (player.meleeMaxTimer - player.meleeTimer) / player.meleeMaxTimer;
+                        ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+                        ctx.lineWidth = Math.max(0.5, 4 * (1 - progress));
+                        ctx.shadowBlur = 8;
+                        ctx.shadowColor = "#ffffff";
+                        ctx.beginPath();
+                        ctx.moveTo(0, -25);
+                        ctx.quadraticCurveTo(player.meleeRange * 0.9, -10 * (1 - progress), player.meleeRange, 5);
+                        ctx.quadraticCurveTo(player.meleeRange * 0.4, 20, 5, 25);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+
+                    const maskCanvas = document.createElement("canvas");
+                    maskCanvas.width = canvas.width;
+                    maskCanvas.height = canvas.height;
+                    const mctx = maskCanvas.getContext("2d");
+                    mctx.fillStyle = bossRoomLit ? "rgba(255, 255, 255, 0.0)" : "rgba(2, 2, 5, 0.97)";
+                    mctx.fillRect(0, 0, canvas.width, canvas.height);
+                    mctx.globalCompositeOperation = "destination-out";
+                    let screenEyeX = player.x - camera.x + (player.direction === 1 ? player.width - 4 : 4);
+                    let screenEyeY = player.y + 10;
+                    let viewAngle = player.direction === 1 ? 0 : Math.PI;
+                    let coneGradient = mctx.createRadialGradient(screenEyeX, screenEyeY, 10, screenEyeX, screenEyeY, player.lightRange);
+                    coneGradient.addColorStop(0, "rgba(255, 255, 255, 1.0)");
+                    coneGradient.addColorStop(0.4, "rgba(255, 255, 255, 0.85)");
+                    coneGradient.addColorStop(1, "rgba(255, 255, 255, 0.0)");
+                    mctx.fillStyle = coneGradient;
+                    mctx.beginPath();
+                    mctx.moveTo(screenEyeX, screenEyeY);
+                    mctx.arc(screenEyeX, screenEyeY, player.lightRange, viewAngle - player.lightAngle, viewAngle + player.lightAngle);
+                    mctx.closePath();
+                    mctx.fill();
+                    let screenPlayerX = player.x - camera.x;
+                    let pCenterX = screenPlayerX + player.width / 2;
+                    let pCenterY = player.y + player.height / 2;
+                    let auraGrad = mctx.createRadialGradient(pCenterX, pCenterY, 5, pCenterX, pCenterY, 65);
+                    auraGrad.addColorStop(0, "rgba(255, 255, 255, 1.0)");
+                    auraGrad.addColorStop(0.5, "rgba(255, 255, 255, 0.75)");
+                    auraGrad.addColorStop(1, "rgba(255, 255, 255, 0.0)");
+                    mctx.fillStyle = auraGrad;
+                    mctx.beginPath();
+                    mctx.arc(pCenterX, pCenterY, 65, 0, Math.PI * 2);
+                    mctx.fill();
+                    playerProjectiles.forEach(pProj => {
+                        let sProjX = pProj.x - camera.x;
+                        let bulletGrad = mctx.createRadialGradient(sProjX, pProj.y, 2, sProjX, pProj.y, 50);
+                        bulletGrad.addColorStop(0, "rgba(255, 255, 255, 1.0)");
+                        bulletGrad.addColorStop(1, "rgba(255, 255, 255, 0.0)");
+                        mctx.fillStyle = bulletGrad;
+                        mctx.beginPath();
+                        mctx.arc(sProjX, pProj.y, 50, 0, Math.PI * 2);
+                        mctx.fill();
+                    });
+                    if (player.flashActive) {
+                        let flashGrad = mctx.createRadialGradient(pCenterX, pCenterY, player.flashRadius * 0.2, pCenterX, pCenterY, player.flashRadius);
+                        flashGrad.addColorStop(0, "rgba(255, 255, 255, 1.0)");
+                        flashGrad.addColorStop(0.8, "rgba(255, 255, 255, 0.82)");
+                        flashGrad.addColorStop(1, "rgba(255, 255, 255, 0.0)");
+                        mctx.fillStyle = flashGrad;
+                        mctx.beginPath();
+                        mctx.arc(pCenterX, pCenterY, player.flashRadius, 0, Math.PI * 2);
+                        mctx.fill();
+                    }
+                    ctx.restore();
+                    ctx.drawImage(maskCanvas, 0, 0);
+                    ctx.save();
+                    ctx.translate(-camera.x, 0);
+
+                    ctx.globalCompositeOperation = "screen";
+                    enemyProjectiles.forEach(proj => {
+                        let redLightGrad = ctx.createRadialGradient(proj.x, proj.y, proj.radius, proj.x, proj.y, 65);
+                        redLightGrad.addColorStop(0, "rgba(230, 30, 30, 0.45)");
+                        redLightGrad.addColorStop(0.5, "rgba(180, 20, 20, 0.2)");
+                        redLightGrad.addColorStop(1, "rgba(0, 0, 0, 0.0)");
+                        ctx.fillStyle = redLightGrad;
+                        ctx.beginPath();
+                        ctx.arc(proj.x, proj.y, 65, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+                    ctx.globalCompositeOperation = "source-over";
+
+                    if (playMode === "boss") {
+                        drawBoss();
+                        drawBossHazards();
+                    }
+
+                    ctx.fillStyle = "#ffffff";
+                    let eyeOffsetX = player.direction === 1 ? 14 : 2;
+                    if (player.squishX > 1.1) eyeOffsetX = player.direction === 1 ? 18 : 0;
+                    ctx.fillRect(player.x + eyeOffsetX, player.y + 8, 4, 4);
+                    ctx.fillRect(player.x + eyeOffsetX + 6, player.y + 8, 4, 4);
+                    enemies.forEach(e => {
+                        ctx.fillStyle = "#ff2222";
+                        let eyeYOffset = 10;
+                        if (e.animState === "charge") eyeYOffset = 19;
+                        if (e.animState === "spit") eyeYOffset = 4;
+                        if (e.direction === 1) {
+                            ctx.fillRect(e.x + e.w - 12, e.y + eyeYOffset, 3, 3);
+                            ctx.fillRect(e.x + e.w - 6, e.y + eyeYOffset, 3, 3);
+                        } else {
+                            ctx.fillRect(e.x + 4, e.y + eyeYOffset, 3, 3);
+                            ctx.fillRect(e.x + 10, e.y + eyeYOffset, 3, 3);
+                        }
+                    });
+                }
+
+                ashParticles.forEach(p => {
+                    p.y += p.speedY;
+                    p.x += p.speedX;
+                    if (p.y > canvas.height) {
+                        p.y = -10;
+                        p.x = Math.random() * canvas.width;
+                    }
+                    let globalX = p.x + camera.x;
+                    let showAsh = (gameState !== "PLAYING") || checkPointInLight(globalX, p.y) || player.flashActive || playerProjectiles.some(bp => Math.abs(bp.x - globalX) < 50 && Math.abs(bp.y - p.y) < 50);
+                    if (showAsh) {
+                        ctx.fillStyle = p.color;
+                        ctx.globalAlpha = p.alpha;
+                        ctx.fillRect(Math.floor(globalX), Math.floor(p.y), Math.floor(p.size), Math.floor(p.size));
+                        ctx.globalAlpha = 1.0;
+                    }
+                });
+                ctx.restore();
+            }
+
+            function loop(timestamp) {
+                let dt = timestamp - lastTime;
+                if (dt > 100) dt = 16;
+                lastTime = timestamp;
+                update(dt);
+                draw();
+                requestAnimationFrame(loop);
+            }
+
+            renderHearts();
+            requestAnimationFrame((time) => {
+                lastTime = time;
+                requestAnimationFrame(loop);
+            });
+        }
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", startLightsEcho);
+} else {
+    startLightsEcho();
+}
