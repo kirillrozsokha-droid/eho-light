@@ -1,0 +1,84 @@
+<div id="game-container">
+<canvas id="gameCanvas"></canvas>
+
+        <div id="ui-container" class="hidden">
+            <div id="game-actions">
+                <button id="btn-restart-run" class="mini-btn" type="button">RESTART</button>
+                <button id="btn-toggle-music" class="mini-btn" type="button">MUSIC ON</button>
+                <button id="btn-to-menu" class="mini-btn" type="button">MENU</button>
+            </div>
+            <div class="ui-bar-wrapper">
+                <span class="ui-label">HEARTS:</span>
+                <div id="hearts-container"></div>
+            </div>
+            <div class="ui-bar-wrapper">
+                <span class="ui-label">LIGHT:</span>
+                <div class="ui-bar-bg"><div id="light-bar" class="ui-bar-fill light"></div></div>
+            </div>
+            <div class="ui-bar-wrapper">
+                <span class="ui-label">PROGRESS:</span>
+                <div id="progress-text">0m / 600m</div>
+            </div>
+            <div id="boss-ui" class="hidden">
+                <div class="ui-bar-wrapper">
+                    <span class="ui-label">BOSS:</span>
+                    <div class="ui-bar-bg boss-bar"><div id="boss-hp-bar" class="ui-bar-fill boss"></div></div>
+                </div>
+                <div id="boss-phase-text">THE HEART WAKES</div>
+            </div>
+        </div>
+
+        <div id="main-menu" class="screen">
+            <h1>LIGHT'S ECHO</h1>
+            <p class="subtitle">An indie platformer in the dark</p>
+
+            <div class="controls-card">
+                <h3>CONTROL HOTKEYS</h3>
+                <ul>
+                    <li><span>A / D or Arrow Keys</span> Move</li>
+                    <li><span>W / Space</span> Jump</li>
+                    <li><span>Left Mouse Button</span> Ranged attack: Light Blaster</li>
+                    <li><span>Right Mouse Button</span> Melee attack: Flash Blade</li>
+                    <li><span>Shift</span> Light Wave: area cleanse</li>
+                </ul>
+            </div>
+
+            <button id="btn-to-difficulty" class="btn">PLAY</button>
+        </div>
+
+        <div id="difficulty-menu" class="screen hidden">
+            <h2>CHOOSE DIFFICULTY</h2>
+            <p class="subtitle">Difficulty changes route length and enemy density</p>
+
+            <div class="difficulty-buttons">
+                <button class="btn diff-btn" data-diff="easy">
+                    <span class="diff-title">EASY</span>
+                    <span class="diff-desc">Route: 300m | 5 hearts</span>
+                </button>
+                <button class="btn diff-btn" data-diff="medium">
+                    <span class="diff-title">NORMAL</span>
+                    <span class="diff-desc">Route: 600m | 3 hearts</span>
+                </button>
+                <button class="btn diff-btn" data-diff="hard">
+                    <span class="diff-title">HARD</span>
+                    <span class="diff-desc">Route: 1000m | 1 heart</span>
+                </button>
+            </div>
+            <button id="btn-back-to-menu" class="btn secondary">BACK</button>
+        </div>
+
+        <div id="game-over-screen" class="screen hidden">
+            <h2 class="death-title">THE LIGHT WENT OUT...</h2>
+            <p id="fail-reason" class="subtitle">The devourers consumed your spark</p>
+            <button id="btn-restart-fail" class="btn">TRY AGAIN</button>
+            <button class="btn secondary btn-go-menu">MAIN MENU</button>
+        </div>
+
+        <div id="victory-screen" class="screen hidden">
+            <h2 class="victory-title">THE LIGHT PREVAILED!</h2>
+            <p class="subtitle">You crossed the abyss and cleansed this world</p>
+            <button class="btn btn-go-menu">MAIN MENU</button>
+        </div>
+
+        <div id="audio-notice">Sound starts after a click</div>
+</div>
